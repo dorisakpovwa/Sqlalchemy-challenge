@@ -17,9 +17,10 @@ Base = automap_base()
 Base.prepare(engine, reflect=True)
 
 # Save references to each table
-measure = Base.classes.measurement
-stat = Base.classes.station
-
+Measure = Base.classes.measurement
+Stat = Base.classes.station
+# create our session link from python to the DB
+session = Session(engine)
 ########################################################
 # Flask Setup
 ########################################################
@@ -32,60 +33,58 @@ def welcome():
     return (
         f"Welcome to the climate Analysis API!<br/>"
         f"Here are available API routes:<br/>"
-        f"/api/v1.0/measurement<br/>"
-        f"/api/v1.0/prcp<br/>"
-        f"/api/v1.0/station<br/>"
-        f"/api/v1.0/tobs"
+        f"/api/v1.0/precipitation<br/>"
+        f"/api/v1.0/stations<br/>"
+        f"/api/v1.0/tobs<br/>"
+        f"/api/v1.0/temp/start/end>"
+        f"/api/v1.0/"
     )
 
-@app.route("/api/v1.0/measurement")
-def measurement():
-    # create our session link from python to the DB
-    session = Session(engine)
-    # Query all measurement
-    measure_qry = session.query(measure).all()
+@app.route("/api/v1.0/precipitation")
+def precipitation():
+  
+    # Query measurement table to return date and prcp data
+    measure_qry = session.query(Measure.date, Measure.prcp).filter(Measure.date>="2016-08-23").all()
+    
+    prcp_dict = list(np.ravel(measure_qry))
+    """ return the precipitation and date dictionary as Json """
+    return jsonify(prcp_dict)
 
-    session.close()
+@app.route("/api/v1.0/stations")
+def stations():
+  
+    # Query station table and return list of station
+    stat_qry = session.query(Stat.station).all()
 
-    measure_lst = list(np.ravel(measure_qry))
-    return jsonify(measure_lst)
-
-@app.route("/api/v1.0/prcp")
-def prcp():
-    # create our session link from python to the DB
-    session = Session(engine)
-    # Query all measurement
-    prcp_qry = session.query(measure.prcp).all()
-
-    session.close()
-
-    prcp_lst = list(np.ravel(prcp_qry))
-    return jsonify(prcp_lst)
-
-
-@app.route("/api/v1.0/station")
-def station():
-    # create our session link from python to the DB
-    session = Session(engine)
-    # Query all station
-    station_qry = session.query(stat).all()
-
-    session.close()
-
-    station_lst = list(np.ravel(station_qry))
+    station_lst = list(np.ravel(stat_qry))
+    """ return the station list as Json """
     return jsonify(station_lst)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
-    # create our session link from python to the DB
-    session = Session(engine)
-    # Query all station
-    temp_qry = session.query(tobs).all()
-
-    session.close()
+  
+    # Query dates and temperature observations for most active station for last year 
+    temp_qry = session.query(Measure.station, Measure.tobs, Measure.date ).filter(Measure.station == 'USC00519281').filter(Measure.date >= "2016-08-23").all()
 
     temp_lst = list(np.ravel(temp_qry))
+    """ return the Json list of temperature observation """
     return jsonify(temp_lst)
+
+@app.route("/api/v1.0/temp/<start>")
+def start():
+    # Query to get minimum, average and maximum temperature for a given start-end range
+
+    temp=session.query(func.min(Measure.tobs), func.max(Measure.tobs), func.avg(Measure.tobs)).filter(Measure.station==activestation[0][0])
+    temp[0][0], temp[0][1], temp[0][2]
+
+    """ return the Json list of temperature for a given start-end range"""
+    temp_info = start.replace(" ", "").lower()
+    for temperature in temp:
+        search_temp = temperature["start"].replace(" ", "").lower
+
+        if search_temp == temp_info:
+            return jsonify(temperature)
 
 if __name__ == "__main__":
     app.run(debug=True)
+
